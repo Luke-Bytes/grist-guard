@@ -9,25 +9,30 @@
     "properties": {
       "baseUrl": {
         "type": "string",
-        "minLength": 1
+        "minLength": 1,
+        "description": "Base URL for the grist-guard broker, for example http://127.0.0.1:8787"
       },
       "sampleMaxRows": {
         "type": "integer",
         "minimum": 1,
-        "maximum": 200
+        "maximum": 200,
+        "default": 25
       },
       "applyPollMs": {
         "type": "integer",
-        "minimum": 50
+        "minimum": 50,
+        "default": 500
       },
       "applyTimeoutMs": {
         "type": "integer",
-        "minimum": 100
+        "minimum": 100,
+        "default": 10000
       },
       "healthcheckOnRegister": {
-        "type": "boolean"
+        "type": "boolean",
+        "default": true,
+        "description": "When true, the plugin runs a background broker readiness probe during startup."
       }
-    },
-    "required": ["baseUrl"]
+    }
   }
 }

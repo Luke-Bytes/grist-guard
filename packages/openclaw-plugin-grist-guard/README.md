@@ -22,7 +22,7 @@ This native OpenClaw plugin exposes a narrow set of Grist broker tools. It only 
 ## Required Config
 
 - `plugins.entries.grist-guard.config.baseUrl`
-- `plugins.entries.grist-guard.env.GRIST_BROKER_TOKEN`
+- `GRIST_BROKER_TOKEN` in `/home/openclaw/.openclaw/.env`
 - Optional:
   - `sampleMaxRows`
   - `applyPollMs`
@@ -31,17 +31,37 @@ This native OpenClaw plugin exposes a narrow set of Grist broker tools. It only 
 
 ## Install
 
-Use a local path load or local path install. Preferred:
+Supported operator install:
 
 ```bash
-sudo -iu openclaw bash -lc 'openclaw plugins install /mnt/c/Users/Luke/Desktop/Enma/Projects/grist-guard/packages/openclaw-plugin-grist-guard'
+sudo ./scripts/install-openclaw-plugin.sh --base-url http://127.0.0.1:8787
 ```
 
-Or point `plugins.load.paths` at:
+The installer prompts for `GRIST_BROKER_TOKEN`, writes `/home/openclaw/.openclaw/.env`, merges `/home/openclaw/.openclaw/openclaw.json`, restarts `openclaw-gateway.service`, and verifies the plugin load.
 
-```text
-/mnt/c/Users/Luke/Desktop/Enma/Projects/grist-guard/packages/openclaw-plugin-grist-guard
+Non-interactive example:
+
+```bash
+sudo GRIST_BROKER_TOKEN=replace-with-broker-token \
+  ./scripts/install-openclaw-plugin.sh \
+  --base-url http://127.0.0.1:8787
 ```
+
+If you need to do it by hand, the supported package install is:
+
+```bash
+sudo -iu openclaw bash -lc 'openclaw plugins install @grist-guard/grist-guard'
+```
+
+## Contributor Install
+
+For local development only, use a linked install instead of `plugins.load.paths`:
+
+```bash
+sudo -iu openclaw bash -lc 'openclaw plugins install --link /opt/grist-guard/openclaw-plugin-grist-guard'
+```
+
+The linked path must be owned by `openclaw` or `root`. Do not combine a linked install with `plugins.load.paths` for the same plugin id.
 
 ## Tools
 
@@ -72,6 +92,7 @@ Or point `plugins.load.paths` at:
 - `403`: broker policy denied the document, table, or columns
 - `409`: plan needs approval or the schema drifted
 - `503`: broker or downstream Grist path is unavailable
+- Startup warning with missing config: install succeeded, but the plugin stays inactive until `baseUrl` and `GRIST_BROKER_TOKEN` are configured
 - Plugin load failures: inspect `openclaw plugins inspect grist-guard --json`
 
 ## Security Model

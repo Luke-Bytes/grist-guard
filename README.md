@@ -112,7 +112,8 @@ Authorization: Bearer <token>
 
 ## OpenClaw plugin
 
-This repo also includes a native OpenClaw plugin at `packages/openclaw-plugin-grist-guard`.
+This repo also includes a native OpenClaw plugin source package at `packages/openclaw-plugin-grist-guard`.
 
+- First-time installer: `scripts/install-openclaw-plugin.sh`
 - Plugin README: `packages/openclaw-plugin-grist-guard/README.md`
 - Operator runbook: `docs/openclaw-plugin.md`

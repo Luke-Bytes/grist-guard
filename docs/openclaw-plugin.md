@@ -1,9 +1,9 @@
 # OpenClaw Plugin Runbook
 
-Native plugin path:
+Supported package:
 
 ```text
-/mnt/c/Users/Luke/Desktop/Enma/Projects/grist-guard/packages/openclaw-plugin-grist-guard
+@grist-guard/grist-guard
 ```
 
 ## Pre-change status
@@ -14,25 +14,42 @@ Run as the `openclaw` user:
 sudo -iu openclaw bash -lc 'openclaw status --all && openclaw security audit --deep && openclaw approvals get --gateway'
 ```
 
-## OpenClaw Config Snippet
+## First-Time Install
 
-Paste into `/home/openclaw/.openclaw/openclaw.json`:
+Run the installer as root:
+
+```bash
+sudo ./scripts/install-openclaw-plugin.sh --base-url http://127.0.0.1:8787
+```
+
+The script:
+
+- installs `@grist-guard/grist-guard` as the `openclaw` user
+- prompts for `GRIST_BROKER_TOKEN` securely unless you pass `--token`
+- writes `/home/openclaw/.openclaw/.env`
+- merges `/home/openclaw/.openclaw/openclaw.json`
+- enables the default `grist` agent tool allowlist
+- restarts `openclaw-gateway.service` and runs plugin verification
+
+Non-interactive example:
+
+```bash
+sudo GRIST_BROKER_TOKEN=replace-with-broker-token \
+  ./scripts/install-openclaw-plugin.sh \
+  --base-url http://127.0.0.1:8787
+```
+
+## Installed Config Shape
+
+After the script runs, `/home/openclaw/.openclaw/openclaw.json` will contain this plugin section:
 
 ```json
 {
   "plugins": {
     "allow": ["grist-guard"],
-    "load": {
-      "paths": [
-        "/mnt/c/Users/Luke/Desktop/Enma/Projects/grist-guard/packages/openclaw-plugin-grist-guard"
-      ]
-    },
     "entries": {
       "grist-guard": {
         "enabled": true,
-        "env": {
-          "GRIST_BROKER_TOKEN": "replace-with-broker-token"
-        },
         "config": {
           "baseUrl": "http://127.0.0.1:8787",
           "sampleMaxRows": 25,
@@ -70,17 +87,21 @@ Paste into `/home/openclaw/.openclaw/openclaw.json`:
 
 ## Install Commands
 
-Preferred local-path install:
+The supported operator path is the installer above.
+
+If you need to do it by hand, use the managed package install only:
 
 ```bash
-sudo -iu openclaw bash -lc 'openclaw plugins install /mnt/c/Users/Luke/Desktop/Enma/Projects/grist-guard/packages/openclaw-plugin-grist-guard'
+sudo -iu openclaw bash -lc 'openclaw plugins install @grist-guard/grist-guard'
 ```
 
-Or rely on `plugins.load.paths` only:
+Contributor-only linked install:
 
 ```bash
-sudo -iu openclaw bash -lc 'openclaw plugins inspect /mnt/c/Users/Luke/Desktop/Enma/Projects/grist-guard/packages/openclaw-plugin-grist-guard'
+sudo -iu openclaw bash -lc 'openclaw plugins install --link /opt/grist-guard/openclaw-plugin-grist-guard'
 ```
+
+The linked path must be owned by `openclaw` or `root`. Do not combine `--link` with `plugins.load.paths` or any other copy of the same plugin id.
 
 ## Restart And Verify
 
@@ -129,3 +150,7 @@ sudo -iu openclaw bash -lc 'openclaw grist-exec <executionId>'
 ```
 
 The model should not have any tool that approves plans directly.
+
+## Startup Behavior
+
+If `baseUrl` or `GRIST_BROKER_TOKEN` is missing, the plugin now stays inactive and logs a warning instead of taking the gateway down. Finish the config, then restart the gateway.

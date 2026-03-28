@@ -1,17 +1,29 @@
 {
-  "name": "openclaw-plugin-grist-guard",
+  "name": "@grist-guard/grist-guard",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "description": "Grist broker tools for OpenClaw",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "openclaw.plugin.json",
+    "README.md",
+    "skills"
+  ],
   "openclaw": {
     "extensions": [
-      "./index.ts"
+      "./dist/index.js"
     ]
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "node --import tsx --test test/*.test.ts"
+    "prepack": "npm run build",
+    "test": "node --import tsx --test test/*.test.ts",
+    "typecheck": "tsc -p tsconfig.test.json --noEmit"
   },
   "dependencies": {
     "openclaw": "latest"
