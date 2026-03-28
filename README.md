@@ -109,3 +109,10 @@ Authorization: Bearer <token>
 - Destructive actions are disabled.
 - Formula support is proposal-first and approval-gated.
 - Recovery is operator-assisted: the broker stores pre-apply snapshot/state references but does not automate rollback.
+
+## OpenClaw plugin
+
+This repo also includes a native OpenClaw plugin at `packages/openclaw-plugin-grist-guard`.
+
+- Plugin README: `packages/openclaw-plugin-grist-guard/README.md`
+- Operator runbook: `docs/openclaw-plugin.md`

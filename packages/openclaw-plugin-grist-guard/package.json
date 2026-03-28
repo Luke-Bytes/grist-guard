@@ -1,0 +1,24 @@
+{
+  "name": "openclaw-plugin-grist-guard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Grist broker tools for OpenClaw",
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --import tsx --test test/*.test.ts"
+  },
+  "dependencies": {
+    "openclaw": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.21",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3"
+  }
+}
