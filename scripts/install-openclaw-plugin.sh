@@ -295,7 +295,11 @@ config.plugins.entries["grist-guard"] = {
 
 if (configureAgent) {
   config.tools ??= {};
-  config.tools.alsoAllow = ensureArrayIncludes(config.tools.alsoAllow, "grist-guard");
+  if (Array.isArray(config.tools.allow)) {
+    config.tools.allow = ensureArrayIncludes(config.tools.allow, "grist-guard");
+  } else {
+    config.tools.alsoAllow = ensureArrayIncludes(config.tools.alsoAllow, "grist-guard");
+  }
 }
 
 fs.writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`);

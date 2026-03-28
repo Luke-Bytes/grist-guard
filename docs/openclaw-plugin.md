@@ -32,7 +32,7 @@ The script:
 - prompts for `GRIST_BROKER_TOKEN` securely unless you pass `--token`
 - writes `/home/openclaw/.openclaw/.env`
 - merges `/home/openclaw/.openclaw/openclaw.json`
-- adds `grist-guard` to `tools.alsoAllow`
+- adds `grist-guard` to `tools.allow` when that array already exists, otherwise to `tools.alsoAllow`
 - restarts `openclaw-gateway.service` and runs plugin verification
 
 Non-interactive example:
@@ -75,6 +75,8 @@ After the script runs, `/home/openclaw/.openclaw/openclaw.json` will contain thi
   }
 }
 ```
+
+If your existing config already uses `tools.allow`, the installer appends `grist-guard` there instead of setting `tools.alsoAllow`.
 
 ## Install Commands
 
