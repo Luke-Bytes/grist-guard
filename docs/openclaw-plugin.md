@@ -14,6 +14,8 @@ Run as the `openclaw` user:
 sudo -iu openclaw bash -lc 'openclaw status --all && openclaw security audit --deep && openclaw approvals get --gateway'
 ```
 
+OpenClaw CLI commands should be run as `openclaw` with `sudo -iu openclaw`. Do not assume the root shell has `openclaw` on `PATH`.
+
 ## First-Time Install
 
 Run the installer as root:

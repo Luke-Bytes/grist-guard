@@ -43,6 +43,10 @@ require_command() {
   command -v "$1" >/dev/null 2>&1 || fail "required command not found: $1"
 }
 
+run_openclaw() {
+  sudo -iu "${OPENCLAW_USER}" bash -lc "$1"
+}
+
 escape_squote() {
   printf "%s" "$1" | sed "s/'/'\\\\''/g"
 }
@@ -100,7 +104,7 @@ OPENCLAW_HOME="$(getent passwd "${OPENCLAW_USER}" | cut -d: -f6 || true)"
 OPENCLAW_CONFIG="${OPENCLAW_HOME}/.openclaw/openclaw.json"
 OPENCLAW_ENV_FILE="${OPENCLAW_HOME}/.openclaw/.env"
 
-require_command openclaw
+run_openclaw 'command -v openclaw >/dev/null 2>&1' || fail "openclaw CLI is not available for user ${OPENCLAW_USER}. Run commands as that user with sudo -iu ${OPENCLAW_USER}."
 
 if [[ -z "${BROKER_BASE_URL}" ]]; then
   fail "missing broker base URL. Pass --base-url or set BROKER_BASE_URL"
@@ -116,7 +120,7 @@ fi
 [[ -n "${GRIST_BROKER_TOKEN}" ]] || fail "missing broker token"
 
 echo "Installing ${PACKAGE_SPEC} for ${OPENCLAW_USER}..."
-sudo -iu "${OPENCLAW_USER}" bash -lc "openclaw plugins install '$(escape_squote "${PACKAGE_SPEC}")'"
+run_openclaw "openclaw plugins install '$(escape_squote "${PACKAGE_SPEC}")'"
 
 echo "Writing ${OPENCLAW_ENV_FILE}..."
 install -d -o "${OPENCLAW_USER}" -g "${OPENCLAW_USER}" "${OPENCLAW_HOME}/.openclaw"
@@ -259,8 +263,9 @@ if [[ "${RESTART_GATEWAY}" -eq 1 ]]; then
   systemctl restart openclaw-gateway.service
 
   echo "Verifying plugin state..."
-  sudo -iu "${OPENCLAW_USER}" bash -lc 'openclaw plugins inspect grist-guard --json'
-  sudo -iu "${OPENCLAW_USER}" bash -lc 'openclaw plugins doctor'
+  run_openclaw 'openclaw status --all && openclaw security audit --deep && openclaw approvals get --gateway'
+  run_openclaw 'openclaw plugins inspect grist-guard --json'
+  run_openclaw 'openclaw plugins doctor'
 else
   echo "Skipping gateway restart. Restart manually when ready:"
   echo "  sudo systemctl restart openclaw-gateway.service"
