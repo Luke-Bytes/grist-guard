@@ -6,6 +6,11 @@ PACKAGE_SPEC="${PACKAGE_SPEC:-@grist-guard/grist-guard}"
 OPENCLAW_USER="${OPENCLAW_USER:-openclaw}"
 BROKER_BASE_URL="${BROKER_BASE_URL:-}"
 GRIST_BROKER_TOKEN="${GRIST_BROKER_TOKEN:-}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+SOURCE_PLUGIN_DIR="${SOURCE_PLUGIN_DIR:-${REPO_ROOT}/packages/openclaw-plugin-grist-guard}"
+STAGE_DIR="${STAGE_DIR:-/opt/grist-guard/openclaw-plugin-grist-guard}"
+INSTALL_MODE="${INSTALL_MODE:-auto}"
 OPENCLAW_HOME=""
 OPENCLAW_CONFIG=""
 OPENCLAW_ENV_FILE=""
@@ -20,7 +25,10 @@ Usage:
 Options:
   --base-url URL           Required broker base URL.
   --token TOKEN            Broker token. If omitted, the script prompts securely.
-  --package SPEC           Plugin package spec. Default: @grist-guard/grist-guard
+  --package SPEC           Published plugin package spec.
+  --source-path PATH       Repo-local plugin source path. Default: ./packages/openclaw-plugin-grist-guard
+  --stage-dir PATH         Root-owned staging path for local linked installs. Default: /opt/grist-guard/openclaw-plugin-grist-guard
+  --install-mode MODE      auto | package | local. Default: auto
   --openclaw-user USER     Gateway user. Default: openclaw
   --skip-agent             Do not create/update the default "grist" agent tool allowlist.
   --skip-restart           Do not restart openclaw-gateway.service or run post-restart checks.
@@ -30,6 +38,9 @@ Environment overrides:
   BROKER_BASE_URL
   GRIST_BROKER_TOKEN
   PACKAGE_SPEC
+  SOURCE_PLUGIN_DIR
+  STAGE_DIR
+  INSTALL_MODE
   OPENCLAW_USER
 EOF
 }
@@ -68,6 +79,21 @@ while [[ $# -gt 0 ]]; do
       PACKAGE_SPEC="$2"
       shift 2
       ;;
+    --source-path)
+      [[ $# -ge 2 ]] || fail "--source-path requires a value"
+      SOURCE_PLUGIN_DIR="$2"
+      shift 2
+      ;;
+    --stage-dir)
+      [[ $# -ge 2 ]] || fail "--stage-dir requires a value"
+      STAGE_DIR="$2"
+      shift 2
+      ;;
+    --install-mode)
+      [[ $# -ge 2 ]] || fail "--install-mode requires a value"
+      INSTALL_MODE="$2"
+      shift 2
+      ;;
     --openclaw-user)
       [[ $# -ge 2 ]] || fail "--openclaw-user requires a value"
       OPENCLAW_USER="$2"
@@ -98,6 +124,8 @@ require_command node
 require_command install
 require_command sed
 require_command getent
+require_command cp
+require_command rm
 
 OPENCLAW_HOME="$(getent passwd "${OPENCLAW_USER}" | cut -d: -f6 || true)"
 [[ -n "${OPENCLAW_HOME}" ]] || fail "could not resolve home directory for user ${OPENCLAW_USER}"
@@ -113,14 +141,44 @@ fi
 BROKER_BASE_URL="$(printf "%s" "${BROKER_BASE_URL}" | sed 's#/*$##')"
 [[ -n "${BROKER_BASE_URL}" ]] || fail "broker base URL resolved to an empty value"
 
+case "${INSTALL_MODE}" in
+  auto)
+    if [[ -f "${SOURCE_PLUGIN_DIR}/openclaw.plugin.json" ]]; then
+      INSTALL_MODE="local"
+    else
+      INSTALL_MODE="package"
+    fi
+    ;;
+  package|local)
+    ;;
+  *)
+    fail "invalid --install-mode value: ${INSTALL_MODE}"
+    ;;
+esac
+
 if [[ -z "${GRIST_BROKER_TOKEN}" ]]; then
   read -r -s -p "Grist broker token: " GRIST_BROKER_TOKEN
   echo
 fi
 [[ -n "${GRIST_BROKER_TOKEN}" ]] || fail "missing broker token"
 
-echo "Installing ${PACKAGE_SPEC} for ${OPENCLAW_USER}..."
-run_openclaw "openclaw plugins install '$(escape_squote "${PACKAGE_SPEC}")'"
+if [[ "${INSTALL_MODE}" == "local" ]]; then
+  [[ -f "${SOURCE_PLUGIN_DIR}/openclaw.plugin.json" ]] || fail "local plugin source not found: ${SOURCE_PLUGIN_DIR}"
+  [[ -f "${SOURCE_PLUGIN_DIR}/dist/index.js" ]] || fail "local plugin build artifact missing: ${SOURCE_PLUGIN_DIR}/dist/index.js"
+
+  echo "Staging local plugin from ${SOURCE_PLUGIN_DIR} to ${STAGE_DIR}..."
+  install -d -o root -g root "$(dirname "${STAGE_DIR}")"
+  rm -rf "${STAGE_DIR}"
+  install -d -o root -g root "${STAGE_DIR}"
+  cp -a "${SOURCE_PLUGIN_DIR}/." "${STAGE_DIR}/"
+  chown -R root:root "${STAGE_DIR}"
+
+  echo "Installing linked plugin from ${STAGE_DIR} for ${OPENCLAW_USER}..."
+  run_openclaw "openclaw plugins install --link '$(escape_squote "${STAGE_DIR}")'"
+else
+  echo "Installing ${PACKAGE_SPEC} for ${OPENCLAW_USER}..."
+  run_openclaw "openclaw plugins install '$(escape_squote "${PACKAGE_SPEC}")'"
+fi
 
 echo "Writing ${OPENCLAW_ENV_FILE}..."
 install -d -o "${OPENCLAW_USER}" -g "${OPENCLAW_USER}" "${OPENCLAW_HOME}/.openclaw"

@@ -37,7 +37,7 @@ Supported operator install:
 sudo ./scripts/install-openclaw-plugin.sh --base-url http://127.0.0.1:8787
 ```
 
-The installer prompts for `GRIST_BROKER_TOKEN`, writes `/home/openclaw/.openclaw/.env`, merges `/home/openclaw/.openclaw/openclaw.json`, restarts `openclaw-gateway.service`, and verifies the plugin load.
+The installer stages the repo-local plugin into `/opt/grist-guard/openclaw-plugin-grist-guard`, installs it as a linked extension for `openclaw`, prompts for `GRIST_BROKER_TOKEN`, writes `/home/openclaw/.openclaw/.env`, merges `/home/openclaw/.openclaw/openclaw.json`, restarts `openclaw-gateway.service`, and verifies the plugin load.
 
 Non-interactive example:
 
@@ -50,7 +50,11 @@ sudo GRIST_BROKER_TOKEN=replace-with-broker-token \
 If you need to do it by hand, the supported package install is:
 
 ```bash
-sudo -iu openclaw bash -lc 'openclaw plugins install @grist-guard/grist-guard'
+sudo install -d -o root -g root /opt/grist-guard
+sudo rm -rf /opt/grist-guard/openclaw-plugin-grist-guard
+sudo cp -a ./packages/openclaw-plugin-grist-guard /opt/grist-guard/openclaw-plugin-grist-guard
+sudo chown -R root:root /opt/grist-guard/openclaw-plugin-grist-guard
+sudo -iu openclaw bash -lc 'openclaw plugins install --link /opt/grist-guard/openclaw-plugin-grist-guard'
 ```
 
 ## Contributor Install

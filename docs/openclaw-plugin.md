@@ -26,7 +26,8 @@ sudo ./scripts/install-openclaw-plugin.sh --base-url http://127.0.0.1:8787
 
 The script:
 
-- installs `@grist-guard/grist-guard` as the `openclaw` user
+- stages the repo-local plugin into `/opt/grist-guard/openclaw-plugin-grist-guard`
+- installs that staged plugin as a linked extension for the `openclaw` user
 - prompts for `GRIST_BROKER_TOKEN` securely unless you pass `--token`
 - writes `/home/openclaw/.openclaw/.env`
 - merges `/home/openclaw/.openclaw/openclaw.json`
@@ -94,7 +95,11 @@ The supported operator path is the installer above.
 If you need to do it by hand, use the managed package install only:
 
 ```bash
-sudo -iu openclaw bash -lc 'openclaw plugins install @grist-guard/grist-guard'
+sudo install -d -o root -g root /opt/grist-guard
+sudo rm -rf /opt/grist-guard/openclaw-plugin-grist-guard
+sudo cp -a ./packages/openclaw-plugin-grist-guard /opt/grist-guard/openclaw-plugin-grist-guard
+sudo chown -R root:root /opt/grist-guard/openclaw-plugin-grist-guard
+sudo -iu openclaw bash -lc 'openclaw plugins install --link /opt/grist-guard/openclaw-plugin-grist-guard'
 ```
 
 Contributor-only linked install:
@@ -104,6 +109,8 @@ sudo -iu openclaw bash -lc 'openclaw plugins install --link /opt/grist-guard/ope
 ```
 
 The linked path must be owned by `openclaw` or `root`. Do not combine `--link` with `plugins.load.paths` or any other copy of the same plugin id.
+
+Use `--install-mode package --package @grist-guard/grist-guard` only after the package is actually published.
 
 ## Restart And Verify
 
