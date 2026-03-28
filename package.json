@@ -1,0 +1,17 @@
+{
+  "name": "grist-guard-broker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Safe broker/orchestration layer for AI-driven Grist access",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test test/*.test.js",
+    "test:live": "node --test test/live.integration.test.js",
+    "smoke:live": "node scripts/live-smoke.js",
+    "retention:dry-run": "node scripts/prune-retention.js --dry-run"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
