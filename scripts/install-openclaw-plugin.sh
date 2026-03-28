@@ -297,6 +297,7 @@ if (configureAgent) {
   config.tools ??= {};
   if (Array.isArray(config.tools.allow)) {
     config.tools.allow = ensureArrayIncludes(config.tools.allow, "grist-guard");
+    delete config.tools.alsoAllow;
   } else {
     config.tools.alsoAllow = ensureArrayIncludes(config.tools.alsoAllow, "grist-guard");
   }
