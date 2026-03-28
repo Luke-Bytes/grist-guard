@@ -26,6 +26,7 @@ sudo ./scripts/install-openclaw-plugin.sh --base-url http://127.0.0.1:8787
 
 The script:
 
+- builds the plugin from the repo checkout when `packages/openclaw-plugin-grist-guard/dist/index.js` is missing
 - stages the repo-local plugin into `/opt/grist-guard/openclaw-plugin-grist-guard`
 - installs that staged plugin as a linked extension for the `openclaw` user
 - prompts for `GRIST_BROKER_TOKEN` securely unless you pass `--token`
@@ -40,6 +41,12 @@ Non-interactive example:
 sudo GRIST_BROKER_TOKEN=replace-with-broker-token \
   ./scripts/install-openclaw-plugin.sh \
   --base-url http://127.0.0.1:8787
+```
+
+If the repo checkout is owned by a different account, override the build user explicitly:
+
+```bash
+sudo ./scripts/install-openclaw-plugin.sh --base-url http://127.0.0.1:8787 --build-user luke
 ```
 
 ## Installed Config Shape
@@ -97,6 +104,7 @@ If you need to do it by hand, use the managed package install only:
 ```bash
 sudo install -d -o root -g root /opt/grist-guard
 sudo rm -rf /opt/grist-guard/openclaw-plugin-grist-guard
+sudo -iu "$USER" bash -lc 'cd ./packages/openclaw-plugin-grist-guard && npm ci && npm run build'
 sudo cp -a ./packages/openclaw-plugin-grist-guard /opt/grist-guard/openclaw-plugin-grist-guard
 sudo chown -R root:root /opt/grist-guard/openclaw-plugin-grist-guard
 sudo -iu openclaw bash -lc 'openclaw plugins install --link /opt/grist-guard/openclaw-plugin-grist-guard'

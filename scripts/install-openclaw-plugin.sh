@@ -4,6 +4,7 @@ set -euo pipefail
 
 PACKAGE_SPEC="${PACKAGE_SPEC:-@grist-guard/grist-guard}"
 OPENCLAW_USER="${OPENCLAW_USER:-openclaw}"
+BUILD_USER="${BUILD_USER:-${SUDO_USER:-root}}"
 BROKER_BASE_URL="${BROKER_BASE_URL:-}"
 GRIST_BROKER_TOKEN="${GRIST_BROKER_TOKEN:-}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -29,6 +30,7 @@ Options:
   --source-path PATH       Repo-local plugin source path. Default: ./packages/openclaw-plugin-grist-guard
   --stage-dir PATH         Root-owned staging path for local linked installs. Default: /opt/grist-guard/openclaw-plugin-grist-guard
   --install-mode MODE      auto | package | local. Default: auto
+  --build-user USER        User that runs npm build steps for local installs. Default: invoking sudo user
   --openclaw-user USER     Gateway user. Default: openclaw
   --skip-agent             Do not create/update the default "grist" agent tool allowlist.
   --skip-restart           Do not restart openclaw-gateway.service or run post-restart checks.
@@ -41,6 +43,7 @@ Environment overrides:
   SOURCE_PLUGIN_DIR
   STAGE_DIR
   INSTALL_MODE
+  BUILD_USER
   OPENCLAW_USER
 EOF
 }
@@ -56,6 +59,14 @@ require_command() {
 
 run_openclaw() {
   sudo -iu "${OPENCLAW_USER}" bash -lc "$1"
+}
+
+run_build_user() {
+  if [[ "${BUILD_USER}" == "root" ]]; then
+    bash -lc "$1"
+  else
+    sudo -iu "${BUILD_USER}" bash -lc "$1"
+  fi
 }
 
 escape_squote() {
@@ -99,6 +110,11 @@ while [[ $# -gt 0 ]]; do
       OPENCLAW_USER="$2"
       shift 2
       ;;
+    --build-user)
+      [[ $# -ge 2 ]] || fail "--build-user requires a value"
+      BUILD_USER="$2"
+      shift 2
+      ;;
     --skip-agent)
       CONFIGURE_AGENT=0
       shift
@@ -121,6 +137,7 @@ done
 
 require_command sudo
 require_command node
+require_command npm
 require_command install
 require_command sed
 require_command getent
@@ -164,7 +181,15 @@ fi
 
 if [[ "${INSTALL_MODE}" == "local" ]]; then
   [[ -f "${SOURCE_PLUGIN_DIR}/openclaw.plugin.json" ]] || fail "local plugin source not found: ${SOURCE_PLUGIN_DIR}"
-  [[ -f "${SOURCE_PLUGIN_DIR}/dist/index.js" ]] || fail "local plugin build artifact missing: ${SOURCE_PLUGIN_DIR}/dist/index.js"
+
+  if [[ ! -f "${SOURCE_PLUGIN_DIR}/dist/index.js" ]]; then
+    [[ -f "${SOURCE_PLUGIN_DIR}/package-lock.json" ]] || fail "local plugin lockfile missing: ${SOURCE_PLUGIN_DIR}/package-lock.json"
+
+    echo "Building local plugin in ${SOURCE_PLUGIN_DIR} as ${BUILD_USER}..."
+    run_build_user "cd '$(escape_squote "${SOURCE_PLUGIN_DIR}")' && npm ci && npm run build"
+  fi
+
+  [[ -f "${SOURCE_PLUGIN_DIR}/dist/index.js" ]] || fail "local plugin build artifact still missing after build: ${SOURCE_PLUGIN_DIR}/dist/index.js"
 
   echo "Staging local plugin from ${SOURCE_PLUGIN_DIR} to ${STAGE_DIR}..."
   install -d -o root -g root "$(dirname "${STAGE_DIR}")"
