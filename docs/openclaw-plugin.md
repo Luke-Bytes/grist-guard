@@ -32,7 +32,7 @@ The script:
 - prompts for `GRIST_BROKER_TOKEN` securely unless you pass `--token`
 - writes `/home/openclaw/.openclaw/.env`
 - merges `/home/openclaw/.openclaw/openclaw.json`
-- enables the default `grist` agent tool allowlist
+- adds `grist-guard` to `tools.alsoAllow`
 - restarts `openclaw-gateway.service` and runs plugin verification
 
 Non-interactive example:
@@ -70,27 +70,8 @@ After the script runs, `/home/openclaw/.openclaw/openclaw.json` will contain thi
       }
     }
   },
-  "agents": {
-    "entries": {
-      "grist": {
-        "enabled": true,
-        "tools": {
-          "allow": [
-            "grist_list_documents",
-            "grist_get_schema",
-            "grist_get_sample",
-            "grist_plan_add_rows",
-            "grist_plan_update_rows",
-            "grist_get_plan",
-            "grist_apply_plan",
-            "grist_get_execution",
-            "grist_get_recovery",
-            "time"
-          ],
-          "deny": ["exec", "browser", "write_stdin", "apply_patch", "edit"]
-        }
-      }
-    }
+  "tools": {
+    "alsoAllow": ["grist-guard"]
   }
 }
 ```

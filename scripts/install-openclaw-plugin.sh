@@ -32,7 +32,7 @@ Options:
   --install-mode MODE      auto | package | local. Default: auto
   --build-user USER        User that runs npm build steps for local installs. Default: invoking sudo user
   --openclaw-user USER     Gateway user. Default: openclaw
-  --skip-agent             Do not create/update the default "grist" agent tool allowlist.
+  --skip-agent             Do not add grist-guard to tools.alsoAllow.
   --skip-restart           Do not restart openclaw-gateway.service or run post-restart checks.
   --help                   Show this help text.
 
@@ -276,16 +276,6 @@ const ensureArrayIncludes = (value, item) => {
   return next;
 };
 
-const ensureArrayIncludesAll = (value, items) => {
-  let next = Array.isArray(value) ? value.slice() : [];
-  for (const item of items) {
-    if (!next.includes(item)) {
-      next.push(item);
-    }
-  }
-  return next;
-};
-
 const config = readJson();
 config.plugins ??= {};
 config.plugins.allow = ensureArrayIncludes(config.plugins.allow, "grist-guard");
@@ -304,36 +294,8 @@ config.plugins.entries["grist-guard"] = {
 };
 
 if (configureAgent) {
-  config.agents ??= {};
-  config.agents.entries ??= {};
-  const currentAgent = config.agents.entries.grist ?? {};
-  const currentTools = currentAgent.tools ?? {};
-  config.agents.entries.grist = {
-    ...currentAgent,
-    enabled: currentAgent.enabled ?? true,
-    tools: {
-      ...currentTools,
-      allow: ensureArrayIncludesAll(currentTools.allow, [
-        "grist_list_documents",
-        "grist_get_schema",
-        "grist_get_sample",
-        "grist_plan_add_rows",
-        "grist_plan_update_rows",
-        "grist_get_plan",
-        "grist_apply_plan",
-        "grist_get_execution",
-        "grist_get_recovery",
-        "time",
-      ]),
-      deny: ensureArrayIncludesAll(currentTools.deny, [
-        "exec",
-        "browser",
-        "write_stdin",
-        "apply_patch",
-        "edit",
-      ]),
-    },
-  };
+  config.tools ??= {};
+  config.tools.alsoAllow = ensureArrayIncludes(config.tools.alsoAllow, "grist-guard");
 }
 
 fs.writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`);
