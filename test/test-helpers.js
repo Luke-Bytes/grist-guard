@@ -4,6 +4,9 @@ import { tmpdir } from "node:os";
 
 export function createTestConfig(overrides = {}) {
   const directory = mkdtempSync(join(tmpdir(), "grist-guard-"));
+  const policyOverrides = overrides.policy ?? {};
+  const configOverrides = { ...overrides };
+  delete configOverrides.policy;
   const config = {
     serviceName: "test-broker",
     host: "127.0.0.1",
@@ -38,8 +41,9 @@ export function createTestConfig(overrides = {}) {
           },
         },
       },
+      ...policyOverrides,
     },
-    ...overrides,
+    ...configOverrides,
   };
 
   config.cleanup = () => rmSync(directory, { recursive: true, force: true });

@@ -5,12 +5,83 @@ function getDocumentPolicy(config, docId) {
   return config.policy.allowedDocuments[docId];
 }
 
+function isWildcard(value) {
+  return value === "*";
+}
+
+function hasFullDocumentAccess(policy) {
+  if (policy === true || isWildcard(policy)) {
+    return true;
+  }
+
+  if (!policy || typeof policy !== "object") {
+    return false;
+  }
+
+  return policy.allowAll === true || policy.tables === undefined || isWildcard(policy.tables);
+}
+
+function resolveTablePolicy(documentPolicy, tableId) {
+  if (hasFullDocumentAccess(documentPolicy)) {
+    return {
+      read: true,
+      write: true,
+      allowedColumns: "*",
+      wildcard: true,
+    };
+  }
+
+  const tables = documentPolicy.tables ?? {};
+  return tables[tableId] ?? tables["*"] ?? null;
+}
+
+function allowsAllColumns(tablePolicy) {
+  if (!tablePolicy || tablePolicy === true || isWildcard(tablePolicy)) {
+    return true;
+  }
+
+  if (typeof tablePolicy !== "object") {
+    return false;
+  }
+
+  return tablePolicy.allowedColumns === undefined || isWildcard(tablePolicy.allowedColumns) ||
+    (Array.isArray(tablePolicy.allowedColumns) && tablePolicy.allowedColumns.includes("*"));
+}
+
+function canReadTable(tablePolicy) {
+  if (!tablePolicy || tablePolicy === true || isWildcard(tablePolicy)) {
+    return true;
+  }
+
+  if (typeof tablePolicy !== "object") {
+    return false;
+  }
+
+  return tablePolicy.read !== false;
+}
+
+function canWriteTable(tablePolicy) {
+  if (!tablePolicy || tablePolicy === true || isWildcard(tablePolicy)) {
+    return true;
+  }
+
+  if (typeof tablePolicy !== "object") {
+    return false;
+  }
+
+  return tablePolicy.write !== false;
+}
+
 export function listAllowedDocuments(config) {
-  return Object.entries(config.policy.allowedDocuments).map(([docId, policy]) => ({
-    docId,
-    name: policy.name ?? docId,
-    tables: Object.keys(policy.tables ?? {}),
-  }));
+  return Object.entries(config.policy.allowedDocuments).map(([docId, policy]) => {
+    const objectPolicy = typeof policy === "object" && policy !== null ? policy : {};
+    return {
+      docId,
+      name: objectPolicy.name ?? docId,
+      tables: hasFullDocumentAccess(policy) ? ["*"] : Object.keys(objectPolicy.tables ?? {}),
+      fullAccess: hasFullDocumentAccess(policy),
+    };
+  });
 }
 
 export function assertDocumentAllowed(config, docId) {
@@ -28,8 +99,8 @@ export function assertReadAllowed(config, docId, tableId) {
     return documentPolicy;
   }
 
-  const tablePolicy = documentPolicy.tables?.[tableId];
-  if (!tablePolicy?.read) {
+  const tablePolicy = resolveTablePolicy(documentPolicy, tableId);
+  if (!canReadTable(tablePolicy)) {
     throw new BrokerError(403, "table_not_readable", `Read access to ${tableId} is not allowed`);
   }
 
@@ -43,12 +114,16 @@ export function assertWriteAllowed(config, action) {
     return documentPolicy;
   }
 
-  const tablePolicy = documentPolicy.tables?.[action.target.tableId];
-  if (!tablePolicy?.write) {
+  const tablePolicy = resolveTablePolicy(documentPolicy, action.target.tableId);
+  if (!canWriteTable(tablePolicy)) {
     throw new BrokerError(403, "table_not_writable", `Write access to ${action.target.tableId} is not allowed`);
   }
 
   if (action.actionType === ACTION_TYPES.ADD_COLUMN || action.actionType === ACTION_TYPES.PROPOSE_FORMULA) {
+    return tablePolicy;
+  }
+
+  if (allowsAllColumns(tablePolicy)) {
     return tablePolicy;
   }
 

@@ -21,6 +21,10 @@ function parseAllowedDocuments(raw) {
 
   try {
     const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return Object.fromEntries(parsed.map((docId) => [docId, true]));
+    }
+
     return typeof parsed === "object" && parsed !== null ? parsed : {};
   } catch {
     throw new Error("BROKER_ALLOWED_DOCUMENTS_JSON must be valid JSON");

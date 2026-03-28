@@ -28,6 +28,54 @@ Set `BROKER_AUTH_TOKENS` to a comma-separated list of broker bearer tokens. Send
 Authorization: Bearer <token>
 ```
 
+## Document allowlist shapes
+
+`BROKER_ALLOWED_DOCUMENTS_JSON` now supports:
+
+- Full access to a document by ID only:
+
+```json
+{"yourDocId": true}
+```
+
+- Full access to multiple documents:
+
+```json
+["docA", "docB"]
+```
+
+- Wildcard tables or columns inside a restricted document:
+
+```json
+{
+  "yourDocId": {
+    "tables": {
+      "*": {
+        "read": true,
+        "write": true,
+        "allowedColumns": ["*"]
+      }
+    }
+  }
+}
+```
+
+- Mixed strict rules:
+
+```json
+{
+  "yourDocId": {
+    "tables": {
+      "Tasks": {
+        "read": true,
+        "write": true,
+        "allowedColumns": ["Title", "Status"]
+      }
+    }
+  }
+}
+```
+
 ## Main endpoints
 
 - `GET /health/live`
