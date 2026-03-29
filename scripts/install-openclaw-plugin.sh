@@ -32,7 +32,7 @@ Options:
   --install-mode MODE      auto | package | local. Default: auto
   --build-user USER        User that runs npm build steps for local installs. Default: invoking sudo user
   --openclaw-user USER     Gateway user. Default: openclaw
-  --skip-agent             Do not add grist-guard to tools.alsoAllow.
+  --skip-agent             Do not add grist-guard to the global tool allow policy.
   --skip-restart           Do not restart openclaw-gateway.service or run post-restart checks.
   --help                   Show this help text.
 
@@ -149,6 +149,38 @@ OPENCLAW_HOME="$(getent passwd "${OPENCLAW_USER}" | cut -d: -f6 || true)"
 OPENCLAW_CONFIG="${OPENCLAW_HOME}/.openclaw/openclaw.json"
 OPENCLAW_ENV_FILE="${OPENCLAW_HOME}/.openclaw/.env"
 
+# Repair the specific stale conflict created by older installer revisions before
+# any OpenClaw CLI call reads the config and rejects it as invalid.
+OPENCLAW_CONFIG_PATH="${OPENCLAW_CONFIG}" node <<'EOF'
+const fs = require("node:fs");
+const path = process.env.OPENCLAW_CONFIG_PATH;
+
+if (!path || !fs.existsSync(path)) {
+  process.exit(0);
+}
+
+const raw = fs.readFileSync(path, "utf8").trim();
+if (!raw) {
+  process.exit(0);
+}
+
+const config = JSON.parse(raw);
+if (!config.tools || !Array.isArray(config.tools.allow) || !Array.isArray(config.tools.alsoAllow)) {
+  process.exit(0);
+}
+
+const merged = [...config.tools.allow];
+for (const item of config.tools.alsoAllow) {
+  if (!merged.includes(item)) {
+    merged.push(item);
+  }
+}
+
+config.tools.allow = merged;
+delete config.tools.alsoAllow;
+fs.writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`);
+EOF
+
 run_openclaw 'command -v openclaw >/dev/null 2>&1' || fail "openclaw CLI is not available for user ${OPENCLAW_USER}. Run commands as that user with sudo -iu ${OPENCLAW_USER}."
 
 if [[ -z "${BROKER_BASE_URL}" ]]; then
@@ -198,8 +230,8 @@ if [[ "${INSTALL_MODE}" == "local" ]]; then
   cp -a "${SOURCE_PLUGIN_DIR}/." "${STAGE_DIR}/"
   chown -R root:root "${STAGE_DIR}"
 
-  echo "Installing linked plugin from ${STAGE_DIR} for ${OPENCLAW_USER}..."
-  run_openclaw "openclaw plugins install --link '$(escape_squote "${STAGE_DIR}")'"
+  echo "Installing plugin from ${STAGE_DIR} for ${OPENCLAW_USER}..."
+  run_openclaw "openclaw plugins install '$(escape_squote "${STAGE_DIR}")'"
 else
   echo "Installing ${PACKAGE_SPEC} for ${OPENCLAW_USER}..."
   run_openclaw "openclaw plugins install '$(escape_squote "${PACKAGE_SPEC}")'"
@@ -298,8 +330,10 @@ if (configureAgent) {
   if (Array.isArray(config.tools.allow)) {
     config.tools.allow = ensureArrayIncludes(config.tools.allow, "grist-guard");
     delete config.tools.alsoAllow;
-  } else {
+  } else if (Array.isArray(config.tools.alsoAllow)) {
     config.tools.alsoAllow = ensureArrayIncludes(config.tools.alsoAllow, "grist-guard");
+  } else {
+    config.tools.allow = ensureArrayIncludes(config.tools.allow, "grist-guard");
   }
 }
 

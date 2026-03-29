@@ -1,6 +1,6 @@
 # OpenClaw Plugin Runbook
 
-Supported package:
+Future published package:
 
 ```text
 @grist-guard/grist-guard
@@ -28,10 +28,11 @@ The script:
 
 - builds the plugin from the repo checkout when `packages/openclaw-plugin-grist-guard/dist/index.js` is missing
 - stages the repo-local plugin into `/opt/grist-guard/openclaw-plugin-grist-guard`
-- installs that staged plugin as a linked extension for the `openclaw` user
+- installs that staged plugin with `openclaw plugins install /opt/grist-guard/openclaw-plugin-grist-guard`
 - prompts for `GRIST_BROKER_TOKEN` securely unless you pass `--token`
 - writes `/home/openclaw/.openclaw/.env`
 - merges `/home/openclaw/.openclaw/openclaw.json`
+- repairs any stale `tools.allow` + `tools.alsoAllow` conflict from older installer runs
 - adds `grist-guard` to `tools.allow` when that array already exists, otherwise to `tools.alsoAllow`
 - restarts `openclaw-gateway.service` and runs plugin verification
 
@@ -71,26 +72,26 @@ After the script runs, `/home/openclaw/.openclaw/openclaw.json` will contain thi
     }
   },
   "tools": {
-    "alsoAllow": ["grist-guard"]
+    "allow": ["grist-guard"]
   }
 }
 ```
 
-If your existing config already uses `tools.allow`, the installer appends `grist-guard` there instead of setting `tools.alsoAllow`.
+If your existing config already uses `tools.allow`, the installer appends `grist-guard` there and removes any stale `tools.alsoAllow` left by an older broken install. If your existing config uses `tools.alsoAllow` without `tools.allow`, the installer preserves that shape.
 
 ## Install Commands
 
 The supported operator path is the installer above.
 
-If you need to do it by hand, use the managed package install only:
+If you need to do it by hand, use the local path install:
 
 ```bash
 sudo install -d -o root -g root /opt/grist-guard
 sudo rm -rf /opt/grist-guard/openclaw-plugin-grist-guard
-sudo -iu "$USER" bash -lc 'cd ./packages/openclaw-plugin-grist-guard && npm ci && npm run build'
+sudo -iu <build-user> bash -lc 'cd /path/to/grist-guard/packages/openclaw-plugin-grist-guard && npm ci && npm run build'
 sudo cp -a ./packages/openclaw-plugin-grist-guard /opt/grist-guard/openclaw-plugin-grist-guard
 sudo chown -R root:root /opt/grist-guard/openclaw-plugin-grist-guard
-sudo -iu openclaw bash -lc 'openclaw plugins install --link /opt/grist-guard/openclaw-plugin-grist-guard'
+sudo -iu openclaw bash -lc 'openclaw plugins install /opt/grist-guard/openclaw-plugin-grist-guard'
 ```
 
 Contributor-only linked install:

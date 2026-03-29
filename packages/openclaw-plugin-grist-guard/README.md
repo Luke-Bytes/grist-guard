@@ -37,7 +37,7 @@ Supported operator install:
 sudo ./scripts/install-openclaw-plugin.sh --base-url http://127.0.0.1:8787
 ```
 
-The installer builds the plugin from the repo checkout when needed, stages it into `/opt/grist-guard/openclaw-plugin-grist-guard`, installs it as a linked extension for `openclaw`, prompts for `GRIST_BROKER_TOKEN`, writes `/home/openclaw/.openclaw/.env`, merges `/home/openclaw/.openclaw/openclaw.json`, adds `grist-guard` to the existing global tool allow policy, restarts `openclaw-gateway.service`, and verifies the plugin load.
+The installer builds the plugin from the repo checkout when needed, stages it into `/opt/grist-guard/openclaw-plugin-grist-guard`, installs it with `openclaw plugins install /opt/grist-guard/openclaw-plugin-grist-guard`, prompts for `GRIST_BROKER_TOKEN`, writes `/home/openclaw/.openclaw/.env`, merges `/home/openclaw/.openclaw/openclaw.json`, repairs stale `tools.allow` + `tools.alsoAllow` conflicts from older failed installs, adds `grist-guard` to the existing global tool allow policy, restarts `openclaw-gateway.service`, and verifies the plugin load.
 
 Non-interactive example:
 
@@ -47,7 +47,7 @@ sudo GRIST_BROKER_TOKEN=replace-with-broker-token \
   --base-url http://127.0.0.1:8787
 ```
 
-If you need to do it by hand, the supported package install is:
+If you need to do it by hand, the supported local install is:
 
 ```bash
 sudo install -d -o root -g root /opt/grist-guard
@@ -55,7 +55,7 @@ sudo rm -rf /opt/grist-guard/openclaw-plugin-grist-guard
 cd ./packages/openclaw-plugin-grist-guard && npm ci && npm run build && cd ../..
 sudo cp -a ./packages/openclaw-plugin-grist-guard /opt/grist-guard/openclaw-plugin-grist-guard
 sudo chown -R root:root /opt/grist-guard/openclaw-plugin-grist-guard
-sudo -iu openclaw bash -lc 'openclaw plugins install --link /opt/grist-guard/openclaw-plugin-grist-guard'
+sudo -iu openclaw bash -lc 'openclaw plugins install /opt/grist-guard/openclaw-plugin-grist-guard'
 ```
 
 ## Contributor Install
