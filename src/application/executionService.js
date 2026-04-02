@@ -3,15 +3,17 @@ import { randomUUID } from "node:crypto";
 import { EXECUTION_STATUS, PLAN_STATUS } from "../domain/constants.js";
 import { BrokerError } from "../domain/errors.js";
 import { createSchemaFingerprint } from "../domain/validation.js";
+import { createNoopLogger } from "../observability/logger.js";
 import { withRetry } from "./retry.js";
 
 export class ExecutionService {
-  constructor({ config, store, gristClient, lockManager, metricsService }) {
+  constructor({ config, store, gristClient, lockManager, metricsService, logger }) {
     this.config = config;
     this.store = store;
     this.gristClient = gristClient;
     this.lockManager = lockManager;
     this.metricsService = metricsService;
+    this.logger = logger ?? createNoopLogger();
   }
 
   getPlan(planId) {
@@ -40,6 +42,11 @@ export class ExecutionService {
 
     this.store.insertApproval(approval);
     this.store.updatePlanStatus(planId, PLAN_STATUS.APPROVED, "approved_at", approval.created_at);
+    this.logger.info("plan_approved", {
+      planId,
+      actorId,
+      commentProvided: Boolean(comment),
+    });
     return this.getPlan(planId);
   }
 
@@ -59,6 +66,11 @@ export class ExecutionService {
         recovery = await this.gristClient.captureRecoveryMarker(plan.target.docId);
       } catch (error) {
         if (this.config.policy.requireRecoveryMarker) {
+          this.logger.error("recovery_capture_failed", {
+            planId: plan.id,
+            docId: plan.target.docId,
+            error: error.message,
+          });
           throw new BrokerError(503, "recovery_capture_failed", `Failed to capture recovery marker: ${error.message}`);
         }
 
@@ -67,10 +79,20 @@ export class ExecutionService {
           degraded: true,
           error: error.message,
         };
+        this.logger.warn("recovery_capture_degraded", {
+          planId: plan.id,
+          docId: plan.target.docId,
+          error: error.message,
+        });
       }
 
       if (latestFingerprint !== plan.schemaFingerprint) {
         this.metricsService.increment("schema_drift_failures");
+        this.logger.warn("schema_drift_detected", {
+          planId: plan.id,
+          docId: plan.target.docId,
+          tableId: plan.target.tableId,
+        });
         throw new BrokerError(409, "schema_drift_detected", "Live schema changed since plan creation");
       }
 
@@ -86,8 +108,15 @@ export class ExecutionService {
             shouldRetry(error) {
               return error.retryable === true;
             },
-            onRetry: () => {
+            onRetry: (error, attempt) => {
               this.metricsService.increment("grist_retries");
+              this.logger.warn("grist_retry_scheduled", {
+                planId: plan.id,
+                docId: plan.target.docId,
+                tableId: plan.target.tableId,
+                attempt,
+                error: error.message,
+              });
             },
           },
         );
@@ -104,6 +133,13 @@ export class ExecutionService {
         });
         this.store.updatePlanStatus(plan.id, PLAN_STATUS.APPLIED, "applied_at", new Date().toISOString());
         this.metricsService.increment("applies_succeeded");
+        this.logger.info("plan_applied", {
+          planId: plan.id,
+          executionId,
+          docId: plan.target.docId,
+          tableId: plan.target.tableId,
+          actionType: plan.actionType,
+        });
       } catch (error) {
         this.store.insertExecution({
           id: executionId,
@@ -120,6 +156,15 @@ export class ExecutionService {
           finished_at: new Date().toISOString(),
         });
         this.metricsService.increment("applies_failed");
+        this.logger.error("plan_apply_failed", {
+          planId: plan.id,
+          executionId,
+          docId: plan.target.docId,
+          tableId: plan.target.tableId,
+          actionType: plan.actionType,
+          code: error.code ?? "execution_failed",
+          error: error.message,
+        });
         throw error;
       }
 

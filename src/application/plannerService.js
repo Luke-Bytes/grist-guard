@@ -3,28 +3,48 @@ import { randomUUID } from "node:crypto";
 import { PLAN_STATUS } from "../domain/constants.js";
 import { assertWriteAllowed, determineApprovalRequirement } from "../domain/policy.js";
 import { createSchemaFingerprint, normalizeActionRequest, normalizeIdempotencyKey } from "../domain/validation.js";
+import { createNoopLogger } from "../observability/logger.js";
 
 export class PlannerService {
-  constructor({ config, store, gristClient }) {
+  constructor({ config, store, gristClient, logger }) {
     this.config = config;
     this.store = store;
     this.gristClient = gristClient;
+    this.logger = logger ?? createNoopLogger();
   }
 
   async createPlan(input, context) {
     const idempotencyKey = normalizeIdempotencyKey(input.idempotencyKey);
     const existingPlan = this.store.findPlanByIdempotencyKey(idempotencyKey);
     if (existingPlan) {
+      this.logger.info("plan_reused", {
+        planId: existingPlan.id,
+        idempotencyKey,
+        actorId: context.actorId,
+        requestId: context.requestId,
+      });
       return existingPlan;
     }
 
     const normalizedAction = normalizeActionRequest(input, this.config.policy.maxPlanRows);
     assertWriteAllowed(this.config, normalizedAction);
 
-    const liveSchema = await this.gristClient.getSchemaFingerprintPayload(
-      normalizedAction.target.docId,
-      normalizedAction.target.tableId,
-    );
+    let liveSchema;
+    try {
+      liveSchema = await this.gristClient.getSchemaFingerprintPayload(
+        normalizedAction.target.docId,
+        normalizedAction.target.tableId,
+      );
+    } catch (error) {
+      this.logger.warn("plan_schema_fetch_failed", {
+        actionType: normalizedAction.actionType,
+        docId: normalizedAction.target.docId,
+        tableId: normalizedAction.target.tableId,
+        error: error.message,
+      });
+      throw error;
+    }
+
     const schemaFingerprint = createSchemaFingerprint(liveSchema);
     const approvalRequirement = determineApprovalRequirement(this.config, normalizedAction);
     const status = approvalRequirement.required ? PLAN_STATUS.PENDING_APPROVAL : PLAN_STATUS.APPROVED;
@@ -46,6 +66,17 @@ export class PlannerService {
     };
 
     this.store.insertPlan(plan);
+
+    this.logger.info("plan_created", {
+      planId: plan.id,
+      actionType: normalizedAction.actionType,
+      docId: normalizedAction.target.docId,
+      tableId: normalizedAction.target.tableId,
+      requiresApproval: approvalRequirement.required,
+      approvalReason: approvalRequirement.reason,
+      actorId: context.actorId,
+      requestId: context.requestId,
+    });
 
     return this.store.getPlan(plan.id);
   }

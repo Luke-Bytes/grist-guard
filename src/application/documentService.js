@@ -1,10 +1,32 @@
 import { assertReadAllowed, listAllowedDocuments } from "../domain/policy.js";
-import { BrokerError } from "../domain/errors.js";
+import { BrokerError, isBrokerError } from "../domain/errors.js";
+import { createNoopLogger } from "../observability/logger.js";
+
+function isGristViewAccessError(error) {
+  return isBrokerError(error) &&
+    error.code === "grist_request_failed" &&
+    error.statusCode === 403 &&
+    error.message.includes("No view access");
+}
+
+function wrapGristViewAccessError(docId, error) {
+  if (!isGristViewAccessError(error)) {
+    throw error;
+  }
+
+  throw new BrokerError(
+    502,
+    "grist_doc_inaccessible",
+    `Grist denied view access to document ${docId}. Verify the configured GRIST_API_KEY can open this document and that BROKER_ALLOWED_DOCUMENTS_JSON uses the correct Grist document ID.`,
+    { docId },
+  );
+}
 
 export class DocumentService {
-  constructor({ config, gristClient }) {
+  constructor({ config, gristClient, logger }) {
     this.config = config;
     this.gristClient = gristClient;
+    this.logger = logger ?? createNoopLogger();
   }
 
   listAllowedDocuments() {
@@ -13,7 +35,17 @@ export class DocumentService {
 
   async getSchema(docId) {
     assertReadAllowed(this.config, docId);
-    return this.gristClient.listDocumentSchema(docId);
+    try {
+      return await this.gristClient.listDocumentSchema(docId);
+    } catch (error) {
+      if (isGristViewAccessError(error)) {
+        this.logger.warn("grist_document_inaccessible", {
+          docId,
+          guidance: "Verify GRIST_API_KEY document access and BROKER_ALLOWED_DOCUMENTS_JSON docId values",
+        });
+      }
+      wrapGristViewAccessError(docId, error);
+    }
   }
 
   async getTableSample(docId, tableId, query) {
@@ -35,10 +67,21 @@ export class DocumentService {
 
     const sort = typeof query.sort === "string" ? query.sort : undefined;
 
-    return this.gristClient.readTableSample(docId, tableId, {
-      limit: boundedLimit,
-      filter,
-      sort,
-    });
+    try {
+      return await this.gristClient.readTableSample(docId, tableId, {
+        limit: boundedLimit,
+        filter,
+        sort,
+      });
+    } catch (error) {
+      if (isGristViewAccessError(error)) {
+        this.logger.warn("grist_document_inaccessible", {
+          docId,
+          tableId,
+          guidance: "Verify GRIST_API_KEY document access and BROKER_ALLOWED_DOCUMENTS_JSON docId values",
+        });
+      }
+      wrapGristViewAccessError(docId, error);
+    }
   }
 }

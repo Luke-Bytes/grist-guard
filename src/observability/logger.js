@@ -4,6 +4,17 @@ function serializeMeta(meta = {}) {
   );
 }
 
+export function createNoopLogger() {
+  return {
+    child() {
+      return this;
+    },
+    info() {},
+    warn() {},
+    error() {},
+  };
+}
+
 export function createLogger(base = {}) {
   function log(level, message, meta) {
     const entry = {

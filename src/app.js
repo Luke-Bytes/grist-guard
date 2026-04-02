@@ -19,11 +19,29 @@ export function createApp(customConfig, overrides = {}) {
   const gristClient = overrides.gristClient ?? new GristClient(config.grist);
   const metricsService = overrides.metricsService ?? new MetricsService();
   const lockManager = overrides.lockManager ?? new ExecutionLockManager();
-  const documentService = new DocumentService({ config, gristClient });
-  const plannerService = new PlannerService({ config, store, gristClient });
-  const executionService = new ExecutionService({ config, store, gristClient, lockManager, metricsService });
+  const documentService = new DocumentService({ config, gristClient, logger: logger.child({ component: "document_service" }) });
+  const plannerService = new PlannerService({
+    config,
+    store,
+    gristClient,
+    logger: logger.child({ component: "planner_service" }),
+  });
+  const executionService = new ExecutionService({
+    config,
+    store,
+    gristClient,
+    lockManager,
+    metricsService,
+    logger: logger.child({ component: "execution_service" }),
+  });
   const auditService = new AuditService({ store });
-  const healthService = new HealthService({ config, store, gristClient, metricsService });
+  const healthService = new HealthService({
+    config,
+    store,
+    gristClient,
+    metricsService,
+    logger: logger.child({ component: "health_service" }),
+  });
   const retentionService = new RetentionService({ config, store });
   const server = createHttpServer({
     config,

@@ -1,9 +1,12 @@
+import { createNoopLogger } from "../observability/logger.js";
+
 export class HealthService {
-  constructor({ config, store, gristClient, metricsService }) {
+  constructor({ config, store, gristClient, metricsService, logger }) {
     this.config = config;
     this.store = store;
     this.gristClient = gristClient;
     this.metricsService = metricsService;
+    this.logger = logger ?? createNoopLogger();
     this.cachedReady = null;
   }
 
@@ -28,6 +31,9 @@ export class HealthService {
       payload.status = "degraded";
       payload.checks.sqlite = "error";
       payload.error = { message: error.message };
+      this.logger.error("readiness_sqlite_failed", {
+        error: error.message,
+      });
     }
 
     if (payload.status === "ready") {
@@ -38,6 +44,10 @@ export class HealthService {
         payload.status = "degraded";
         payload.checks.grist = "error";
         payload.error = { message: error.message };
+        this.logger.warn("readiness_grist_failed", {
+          error: error.message,
+          guidance: "Check GRIST_BASE_URL connectivity and GRIST_API_KEY validity",
+        });
       }
     }
 
